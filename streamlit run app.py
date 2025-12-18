@@ -20,14 +20,28 @@ def normalize_bzid(value):
 
 
 # ---------------- LOAD DATA ----------------
+from googleapiclient.discovery import build
+
 @st.cache_data(ttl=3600)
 def load_data():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
-        scopes=scopes
+        scopes=[
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/spreadsheets.readonly",
+        ]
     )
 
+    # 🔹 Explicit Drive access
+    drive_service = build("drive", "v3", credentials=creds)
+
+    # 🔹 This line forces Drive permission check
+    drive_service.files().get(
+        fileId=SHEET_ID,
+        fields="id, name"
+    ).execute()
+
+    # 🔹 If above passes, Sheets access WILL work
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
