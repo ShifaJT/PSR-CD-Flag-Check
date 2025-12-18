@@ -3,412 +3,290 @@ import pandas as pd
 import gspread
 from google.oauth2 import service_account
 import json
-from datetime import datetime
 
-# Page configuration
+# Page configuration - Simple and clean
 st.set_page_config(
-    page_title="BZID Data Lookup",
+    page_title="BZID Lookup",
     page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
-# Simple CSS for clean UI
+# Minimal CSS
 st.markdown("""
 <style>
-    .main-title {
+    .title {
         font-size: 2.5rem;
-        color: #1E3A8A;
+        color: #2563eb;
         text-align: center;
         margin-bottom: 1rem;
-        font-weight: 700;
-    }
-    .data-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 20px;
-        margin: 10px 0;
-        border-left: 4px solid #1E3A8A;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .metric-box {
-        background: white;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 5px;
-        text-align: center;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .metric-value {
-        font-size: 1.8rem;
         font-weight: bold;
-        color: #1E3A8A;
-        margin-bottom: 5px;
-    }
-    .metric-label {
-        font-size: 0.9rem;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .flag-active {
-        background-color: #fee2e2;
-        color: #dc2626;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .flag-inactive {
-        background-color: #dcfce7;
-        color: #16a34a;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-weight: 600;
-        display: inline-block;
     }
     .search-box {
         background: white;
         border-radius: 10px;
-        padding: 30px;
+        padding: 20px;
         margin: 20px 0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .data-card {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 15px 0;
+        border-left: 4px solid #2563eb;
+    }
+    .data-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .data-label {
+        color: #64748b;
+        font-weight: 600;
+    }
+    .data-value {
+        color: #1e293b;
+        font-weight: 500;
+    }
+    .flag-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    .flag-green {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+    .flag-red {
+        background: #fee2e2;
+        color: #dc2626;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Title
-st.markdown('<h1 class="main-title">🔍 BZID Data Lookup</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #666; margin-bottom: 30px;">Enter BZID to get complete player data instantly</p>', unsafe_allow_html=True)
+st.markdown('<h1 class="title">🔍 BZID Lookup</h1>', unsafe_allow_html=True)
 
 # Initialize session state
-if 'all_data' not in st.session_state:
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
     st.session_state.all_data = None
-if 'last_search' not in st.session_state:
-    st.session_state.last_search = None
 
-# Sidebar for Google Sheets Configuration
-with st.sidebar:
-    st.markdown("### ⚙️ Google Sheets Setup")
-    
-    # JSON key input
-    json_key = st.text_area(
-        "Paste Google Service Account JSON Key:",
-        height=200,
-        help="Paste the complete JSON key from Google Cloud Console"
-    )
-    
-    sheet_url = st.text_input(
-        "Google Sheet URL:",
-        placeholder="https://docs.google.com/spreadsheets/d/...",
-        help="The full URL of your Google Sheet"
-    )
-    
-    sheet_name = st.text_input(
-        "Sheet Name:",
-        value="Main Sheet",
-        help="Name of the worksheet (tab) in your Google Sheet"
-    )
-    
-    connect_btn = st.button("📥 Load Data from Google Sheets", type="primary", use_container_width=True)
-    
-    if connect_btn:
-        if json_key and sheet_url:
-            try:
-                # Parse JSON key
-                credentials_dict = json.loads(json_key)
-                
-                # Define scope
-                scope = ['https://spreadsheets.google.com/feeds',
-                        'https://www.googleapis.com/auth/drive']
-                
-                # Authenticate
-                credentials = service_account.Credentials.from_service_account_info(
-                    credentials_dict, scopes=scope
-                )
-                client = gspread.authorize(credentials)
-                
-                # Extract sheet ID from URL
-                if 'spreadsheets/d/' in sheet_url:
-                    sheet_id = sheet_url.split('spreadsheets/d/')[1].split('/')[0]
-                    sheet = client.open_by_key(sheet_id)
-                    
-                    # Get worksheet
-                    try:
-                        worksheet = sheet.worksheet(sheet_name)
-                    except:
-                        worksheet = sheet.get_worksheet(0)  # Fallback to first sheet
-                    
-                    # Get all data
-                    data = worksheet.get_all_records()
-                    df = pd.DataFrame(data)
-                    
-                    if not df.empty:
-                        st.session_state.all_data = df
-                        st.success(f"✅ Loaded {len(df)} records from Google Sheets")
-                        
-                        # Show data preview
-                        st.markdown("### 📊 Data Preview")
-                        st.dataframe(df.head(), use_container_width=True)
-                        
-                        # Show column info
-                        st.markdown(f"**Columns:** {', '.join(df.columns.tolist())}")
-                    else:
-                        st.error("No data found in the sheet")
-                        
-                else:
-                    st.error("Invalid Google Sheets URL format")
-                    
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+# Load Google Sheets data from secrets
+def load_google_sheets():
+    """Load data from Google Sheets using secrets"""
+    try:
+        # Check if secrets are configured
+        if 'gcp_service_account' not in st.secrets:
+            st.error("Google Sheets credentials not found in secrets.")
+            return False
+        
+        # Get credentials from secrets
+        credentials_dict = dict(st.secrets["gcp_service_account"])
+        
+        # Define scope
+        scope = ['https://spreadsheets.google.com/feeds',
+                'https://www.googleapis.com/auth/drive']
+        
+        # Create credentials
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_dict, scopes=scope
+        )
+        
+        # Authorize and open sheet
+        client = gspread.authorize(credentials)
+        
+        # Get sheet from secrets or use default
+        sheet_id = st.secrets.get("sheets", {}).get("sheet_id", "")
+        sheet_name = st.secrets.get("sheets", {}).get("sheet_name", "Main Sheet")
+        
+        if not sheet_id:
+            st.error("Google Sheet ID not found in secrets.")
+            return False
+        
+        # Open the sheet
+        sheet = client.open_by_key(sheet_id)
+        
+        # Get the worksheet
+        try:
+            worksheet = sheet.worksheet(sheet_name)
+        except:
+            worksheet = sheet.get_worksheet(0)  # First sheet
+        
+        # Get all data
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        
+        if df.empty:
+            st.error("No data found in the sheet.")
+            return False
+        
+        st.session_state.all_data = df
+        st.session_state.data_loaded = True
+        return True
+        
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        return False
+
+# Auto-load data on first run
+if not st.session_state.data_loaded:
+    with st.spinner("Loading data from Google Sheets..."):
+        if load_google_sheets():
+            st.success(f"✅ Loaded {len(st.session_state.all_data)} records")
         else:
-            st.warning("Please enter both JSON key and Sheet URL")
+            st.warning("Data not loaded. Check secrets configuration.")
 
-# Main Search Interface
+# Search Interface
 st.markdown('<div class="search-box">', unsafe_allow_html=True)
 
-col1, col2 = st.columns([2, 1])
+bzid_input = st.text_input(
+    "**Enter BZID:**",
+    placeholder="Example: 1305378359 or BZID-1305378359",
+    key="bzid_input"
+)
 
-with col1:
-    bzid_input = st.text_input(
-        "Enter BZID:",
-        placeholder="e.g., BZID-1305378359 or 1305378359",
-        key="bzid_input"
-    )
-
-with col2:
-    st.markdown("<br>", unsafe_allow_html=True)
-    search_btn = st.button("🔍 Search BZID", type="primary", use_container_width=True)
+search_btn = st.button("🔍 Search", type="primary", use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Search Function
-def search_bzid_data(bzid, df):
-    """Search for BZID in the dataframe"""
-    if df is None or df.empty:
+# Search function
+def search_player(bzid):
+    """Search for player by BZID"""
+    if st.session_state.all_data is None:
         return None
     
-    # Clean the BZID input
-    bzid_clean = str(bzid).strip()
+    # Clean the BZID
+    bzid = str(bzid).strip()
     
-    # Try with BZID- prefix
-    if not bzid_clean.startswith('BZID-'):
-        bzid_with_prefix = f"BZID-{bzid_clean}"
-    else:
-        bzid_with_prefix = bzid_clean
+    # Remove BZID- prefix if present in search
+    if bzid.startswith('BZID-'):
+        bzid = bzid[5:]
     
-    # Search in BZID column
-    if 'BZID' in df.columns:
-        result = df[df['BZID'] == bzid_with_prefix]
-        if not result.empty:
-            return result.iloc[0]
+    # Search in the dataframe
+    df = st.session_state.all_data
+    
+    # Try exact match
+    for idx, row in df.iterrows():
+        # Clean the BZID in the dataframe
+        db_bzid = str(row.get('BZID', '')).strip()
+        if db_bzid.startswith('BZID-'):
+            db_bzid_clean = db_bzid[5:]
+        else:
+            db_bzid_clean = db_bzid
         
-        # Try without prefix
-        result = df[df['BZID'] == bzid_clean]
-        if not result.empty:
-            return result.iloc[0]
-        
-        # Try partial match
-        result = df[df['BZID'].str.contains(bzid_clean, na=False)]
-        if not result.empty:
-            return result.iloc[0]
+        if bzid == db_bzid_clean:
+            return row
     
     return None
 
-# Handle Search
+# Handle search
 if search_btn and bzid_input:
-    if st.session_state.all_data is not None:
-        with st.spinner("Searching..."):
-            player_data = search_bzid_data(bzid_input, st.session_state.all_data)
-            st.session_state.last_search = player_data
+    if st.session_state.data_loaded:
+        player_data = search_player(bzid_input)
+        
+        if player_data is not None:
+            st.markdown('<div class="data-card">', unsafe_allow_html=True)
             
-            if player_data is not None:
-                st.success(f"✅ Found data for BZID: {bzid_input}")
-            else:
-                st.error(f"❌ No data found for BZID: {bzid_input}")
+            # Display all data in clean format
+            st.markdown(f"### 📋 **Player Data:** {player_data.get('BZID', 'N/A')}")
+            st.markdown("---")
+            
+            # Display all columns
+            for col in st.session_state.all_data.columns:
+                if col in player_data:
+                    value = player_data[col]
+                    
+                    # Format numeric values
+                    if isinstance(value, (int, float)):
+                        if 'gmv' in col.lower() or 'pct' in col.lower():
+                            try:
+                                if 'pct' in col.lower():
+                                    value = f"{float(value):.2f}%"
+                                else:
+                                    value = f"₹{float(value):,.2f}"
+                            except:
+                                pass
+                    
+                    # Special formatting for CD_flag
+                    if col == 'CD_flag':
+                        flag_class = "flag-green" if "Do not ask" in str(value) else "flag-red"
+                        st.markdown(f"""
+                        <div class="data-row">
+                            <span class="data-label">{col}:</span>
+                            <span class="flag-badge {flag_class}">{value}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div class="data-row">
+                            <span class="data-label">{col}:</span>
+                            <span class="data-value">{value}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Optional: Show raw data
+            with st.expander("📊 View Raw Data"):
+                st.write(player_data.to_dict())
+                
+        else:
+            st.error(f"❌ No data found for BZID: {bzid_input}")
+            
+            # Show suggestions if available
+            if st.session_state.all_data is not None:
+                all_bzids = []
+                for bzid in st.session_state.all_data['BZID']:
+                    if isinstance(bzid, str) and 'BZID-' in bzid:
+                        all_bzids.append(bzid[5:])
+                    else:
+                        all_bzids.append(str(bzid))
+                
+                st.info(f"Try these BZIDs: {', '.join(all_bzids[:5])}...")
     else:
-        st.warning("⚠️ Please load data from Google Sheets first")
+        st.warning("Please wait for data to load...")
 
-# Display Results
-if st.session_state.last_search is not None:
-    player_data = st.session_state.last_search
+# Display data stats if loaded
+if st.session_state.data_loaded:
+    st.sidebar.markdown("### 📊 Data Statistics")
     
-    # Display in a clean card
-    st.markdown('<div class="data-card">', unsafe_allow_html=True)
+    df = st.session_state.all_data
     
-    # Header
-    col1, col2 = st.columns([3, 1])
+    # Basic stats
+    st.sidebar.metric("Total Records", len(df))
     
-    with col1:
-        st.markdown(f"### 📋 Player Data - {player_data.get('BZID', 'N/A')}")
+    if 'cluster' in df.columns:
+        unique_clusters = df['cluster'].nunique()
+        st.sidebar.metric("Clusters", unique_clusters)
     
-    with col2:
-        cd_flag = player_data.get('CD_flag', 'N/A')
-        flag_class = "flag-inactive" if "Do not ask" in str(cd_flag) else "flag-active"
-        st.markdown(f'<span class="{flag_class}">{cd_flag}</span>', unsafe_allow_html=True)
+    if 'hub' in df.columns:
+        unique_hubs = df['hub'].nunique()
+        st.sidebar.metric("Hubs", unique_hubs)
     
-    st.markdown("---")
+    if 'CD_flag' in df.columns:
+        do_not_ask_count = df['CD_flag'].str.contains('Do not ask', na=False).sum()
+        st.sidebar.metric("Do Not Ask", do_not_ask_count)
     
-    # Main Metrics
-    col1, col2, col3, col4 = st.columns(4)
+    # Recent searches
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🔍 Quick Search")
     
-    with col1:
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{player_data.get("cluster", "N/A")}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">CLUSTER</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{player_data.get("hub", "N/A")}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">HUB</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
-        psr_gmv = player_data.get("psr_requested_gmv", 0)
-        if pd.isna(psr_gmv) or psr_gmv == "":
-            psr_gmv = 0
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{psr_gmv:,.2f}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">PSR REQUESTED GMV</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col4:
-        del_gmv = player_data.get("del_gmv", 0)
-        if pd.isna(del_gmv) or del_gmv == "":
-            del_gmv = 0
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{float(del_gmv):,.2f}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">DELIVERED GMV</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Additional Metrics
-    col5, col6, col7 = st.columns(3)
-    
-    with col5:
-        psr_pct = player_data.get("psr_pct", "0%")
-        if pd.isna(psr_pct) or psr_pct == "":
-            psr_pct = "0%"
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{psr_pct}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">PSR PERCENTAGE</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col6:
-        # Calculate utilization if both values exist
-        psr_gmv_val = float(psr_gmv) if psr_gmv != 0 else 0
-        del_gmv_val = float(del_gmv) if del_gmv != 0 else 0
-        utilization = (psr_gmv_val / del_gmv_val * 100) if del_gmv_val != 0 else 0
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{utilization:.1f}%</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">UTILIZATION</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col7:
-        # Status indicator
-        status = "ACTIVE" if del_gmv_val > 0 else "INACTIVE"
-        status_color = "#16a34a" if status == "ACTIVE" else "#dc2626"
-        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value" style="color: {status_color};">{status}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">STATUS</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Detailed Data Table
-    st.markdown("### 📊 Complete Data")
-    
-    # Create a clean display dataframe
-    display_data = pd.DataFrame([
-        {"Field": "BZID", "Value": player_data.get("BZID", "N/A")},
-        {"Field": "Cluster", "Value": player_data.get("cluster", "N/A")},
-        {"Field": "Hub", "Value": player_data.get("hub", "N/A")},
-        {"Field": "PSR Requested GMV", "Value": f"{psr_gmv:,.2f}"},
-        {"Field": "Delivered GMV", "Value": f"{float(del_gmv):,.2f}"},
-        {"Field": "PSR Percentage", "Value": str(psr_pct)},
-        {"Field": "CD Flag", "Value": player_data.get("CD_flag", "N/A")},
-        {"Field": "Utilization Rate", "Value": f"{utilization:.2f}%"},
-        {"Field": "Status", "Value": status}
-    ])
-    
-    # Display as table
-    st.dataframe(
-        display_data,
-        column_config={
-            "Field": st.column_config.Column(width="medium"),
-            "Value": st.column_config.Column(width="large")
-        },
-        hide_index=True,
-        use_container_width=True
-    )
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Export Options
-    with st.expander("📥 Export Data"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # JSON export
-            json_data = player_data.to_dict() if hasattr(player_data, 'to_dict') else dict(player_data)
-            st.download_button(
-                label="Download as JSON",
-                data=json.dumps(json_data, indent=2),
-                file_name=f"{player_data.get('BZID', 'player')}_data.json",
-                mime="application/json",
-                use_container_width=True
-            )
-        
-        with col2:
-            # CSV export
-            csv_data = pd.DataFrame([player_data]).to_csv(index=False)
-            st.download_button(
-                label="Download as CSV",
-                data=csv_data,
-                file_name=f"{player_data.get('BZID', 'player')}_data.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+    # Show first few BZIDs for quick access
+    if 'BZID' in df.columns:
+        sample_bzids = df['BZID'].head(5).tolist()
+        for bzid in sample_bzids:
+            if st.sidebar.button(f"🔎 {bzid}"):
+                st.session_state.bzid_input = str(bzid)
+                st.rerun()
 
-# Initial State Message
-elif st.session_state.all_data is None:
-    st.info("""
-    ### 👋 Welcome to BZID Data Lookup
-    
-    To get started:
-    1. **Configure Google Sheets** in the sidebar
-    2. Enter your Google Service Account JSON key
-    3. Provide your Google Sheet URL
-    4. Click "Load Data from Google Sheets"
-    5. Once data is loaded, search for any BZID
-    
-    This tool provides instant access to player data without waiting for Metabase!
-    """)
-
-# Data Loaded but No Search Yet
-elif st.session_state.all_data is not None and st.session_state.last_search is None:
-    st.success(f"✅ Data loaded successfully! Ready to search {len(st.session_state.all_data)} records")
-    
-    # Quick Stats
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        unique_clusters = st.session_state.all_data['cluster'].nunique() if 'cluster' in st.session_state.all_data.columns else 0
-        st.metric("Unique Clusters", unique_clusters)
-    
-    with col2:
-        unique_hubs = st.session_state.all_data['hub'].nunique() if 'hub' in st.session_state.all_data.columns else 0
-        st.metric("Unique Hubs", unique_hubs)
-    
-    with col3:
-        active_flags = len(st.session_state.all_data[st.session_state.all_data['CD_flag'].str.contains('Do not ask', na=False)])
-        st.metric("Do Not Ask Flags", active_flags)
-
-# Footer
+# Simple footer
 st.markdown("---")
 st.markdown(
-    "<div style='text-align: center; color: #666; font-size: 0.9rem;'>"
-    "🔍 BZID Data Lookup • Instant access to player data • Faster than Metabase"
+    "<div style='text-align: center; color: #64748b; font-size: 0.9rem;'>"
+    "Enter BZID → Get All Data • Instant Results"
     "</div>",
     unsafe_allow_html=True
 )
