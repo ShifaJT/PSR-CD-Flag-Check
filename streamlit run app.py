@@ -5,13 +5,13 @@ from google.oauth2 import service_account
 
 # Page setup - Simple and clean
 st.set_page_config(
-    page_title="BZID Lookup",
+    page_title="PSR CD Flag Check",
     page_icon="🔍",
     layout="centered"
 )
 
 # Simple title
-st.title("🔍 BZID Lookup")
+st.title("🔍 PSR CD Flag Check")
 
 # Initialize session state
 if 'data' not in st.session_state:
@@ -114,7 +114,7 @@ if bzid_input:
                     
                     # Display the data in a clean format
                     st.markdown("---")
-                    st.markdown("### 📋 Player Data")
+                    st.markdown("### 📋 Customer Data")
                     
                     # Create a nice display
                     col1, col2 = st.columns(2)
