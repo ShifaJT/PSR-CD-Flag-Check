@@ -2,15 +2,14 @@ import streamlit as st
 import pandas as pd
 import re
 
+# ---------------- CONFIG ----------------
 SHEET_ID = "1J21WFryYV1pGn5bfJuk15onQVVaPscU-8Y71VhEH2DA"
-SHEET_NAME = "Main Sheet"
+GID = "0"
 
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
 
 
-# -----------------------------
-# Helpers
-# -----------------------------
+# ---------------- HELPERS ----------------
 def normalize_bzid(value):
     if pd.isna(value):
         return ""
@@ -20,9 +19,7 @@ def normalize_bzid(value):
     return value.upper().strip()
 
 
-# -----------------------------
-# Load & Cache Data
-# -----------------------------
+# ---------------- LOAD DATA ----------------
 @st.cache_data(ttl=3600)
 def load_data():
     df = pd.read_csv(SHEET_URL)
@@ -30,9 +27,7 @@ def load_data():
     return df
 
 
-# -----------------------------
-# UI
-# -----------------------------
+# ---------------- UI ----------------
 st.set_page_config(
     page_title="CD – PSR Flag Lookup",
     layout="centered"
