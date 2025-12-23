@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2 import service_account
 from datetime import datetime
+from gspread.exceptions import WorksheetNotFound
 
 # ================= PAGE CONFIG =================
 st.set_page_config(
@@ -12,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================= CSS (ONLY REQUIRED TWEAKS) =================
+# ================= CSS (ONLY REQUIRED HIGHLIGHTS) =================
 st.markdown("""
 <style>
 div[data-testid="stTextInput"] > div > input {
@@ -50,6 +51,7 @@ col1, col2 = st.columns([3, 1])
 with col1:
     st.markdown("## PSR CD Flag Dashboard")
     st.caption("Enterprise-grade customer data lookup system")
+
 with col2:
     st.caption("Last Updated")
     st.write(datetime.now().strftime("%d %b %Y, %H:%M"))
@@ -67,12 +69,11 @@ def load_data():
     client = gspread.authorize(creds)
 
     sheet = client.open_by_key(st.secrets["sheets"]["sheet_id"])
-    sheet_name = st.secrets["sheets"].get("sheet_name", "CD-PSR Flag")
+    sheet_name = st.secrets["sheets"].get("sheet_name", "Main Sheet")
 
-    # ✅ SAFE FALLBACK (critical fix)
     try:
         ws = sheet.worksheet(sheet_name)
-    except gspread.exceptions.WorksheetNotFound:
+    except WorksheetNotFound:
         ws = sheet.get_worksheet(0)
 
     df = pd.DataFrame(ws.get_all_records())
@@ -83,7 +84,6 @@ def load_data():
 with st.sidebar:
     st.markdown("### ⚙️ Controls")
 
-    # ✅ Refresh Data (restored)
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
         st.session_state.data = None
@@ -108,6 +108,7 @@ with st.sidebar:
         df[df["CD_flag"].str.contains("ask", case=False, na=False)].shape[0]
         if "CD_flag" in df.columns else 0
     )
+
     do_not_ask = (
         df[df["CD_flag"].str.contains("do not", case=False, na=False)].shape[0]
         if "CD_flag" in df.columns else 0
@@ -154,7 +155,7 @@ if search_btn and bzid_input:
         if customer_data is None:
             st.error("Customer not found.")
         else:
-            # ================= COPY BLOCK =================
+            # ================= COPY FOR TICKET =================
             psr_pct_display = (
                 f"{float(customer_data['psr_pct']) * 100:.2f}%"
                 if "psr_pct" in df.columns and pd.notna(customer_data["psr_pct"])
