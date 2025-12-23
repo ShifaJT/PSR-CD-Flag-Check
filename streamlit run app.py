@@ -189,7 +189,7 @@ BZID: {customer_data[bzid_col]}
 Cluster: {customer_data.get('cluster', 'NA')}
 Hub: {customer_data.get('hub', 'NA')}
 CD Flag: {customer_data.get('CD_flag', 'NA')}
-PSR %: {customer_data.get('psr_pct', 'NA')}
+PSR %: {f"{float(customer_data['psr_pct'])*100:.2f}%" if pd.notna(customer_data.get('psr_pct')) else "NA"}
 PSR Requested GMV: {customer_data.get('psr_requested_gmv', 'NA')}
 Delivered GMV: {customer_data.get('del_gmv', 'NA')}
 """.strip()
@@ -231,3 +231,47 @@ st.markdown("""
     © 2024 Customer Intelligence Platform • All rights reserved
 </div>
 """, unsafe_allow_html=True)
+st.markdown("### 📊 Customer Details")
+
+tab1, tab2 = st.tabs(["📈 Data Overview", "📋 Complete Customer Data"])
+
+with tab1:
+    overview_rows = []
+
+    if "cluster" in df.columns:
+        overview_rows.append(("Cluster", customer_data.get("cluster", "NA")))
+
+    if "hub" in df.columns:
+        overview_rows.append(("Hub", customer_data.get("hub", "NA")))
+
+    if "CD_flag" in df.columns:
+        overview_rows.append(("CD Flag", customer_data.get("CD_flag", "NA")))
+
+    if "psr_pct" in df.columns and pd.notna(customer_data.get("psr_pct")):
+        overview_rows.append(("PSR %", f"{float(customer_data['psr_pct'])*100:.2f}%"))
+
+    if "psr_requested_gmv" in df.columns:
+        overview_rows.append(("PSR Requested GMV", f"₹{customer_data.get('psr_requested_gmv', 'NA')}"))
+
+    if "del_gmv" in df.columns:
+        overview_rows.append(("Delivered GMV", f"₹{customer_data.get('del_gmv', 'NA')}"))
+
+    overview_df = pd.DataFrame(overview_rows, columns=["Metric", "Value"])
+    st.dataframe(overview_df, hide_index=True, use_container_width=True)
+
+with tab2:
+    full_data = []
+    for col in df.columns:
+        val = customer_data[col]
+        if pd.isna(val) or str(val).strip() == "":
+            continue
+        full_data.append({
+            "Field": col.replace("_", " ").title(),
+            "Value": val
+        })
+
+    st.dataframe(
+        pd.DataFrame(full_data),
+        hide_index=True,
+        use_container_width=True
+    )
