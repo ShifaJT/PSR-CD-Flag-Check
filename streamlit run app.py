@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================= CSS (ONLY highlight tweaks) =================
+# ================= CSS (ONLY REQUIRED TWEAKS) =================
 st.markdown("""
 <style>
 div[data-testid="stTextInput"] > div > input {
@@ -42,6 +42,8 @@ div[data-testid="stTextInput"] label {
 # ================= SESSION STATE =================
 if "data" not in st.session_state:
     st.session_state.data = None
+if "last_update" not in st.session_state:
+    st.session_state.last_update = None
 
 # ================= HEADER =================
 col1, col2 = st.columns([3, 1])
@@ -63,26 +65,53 @@ def load_data():
         ]
     )
     client = gspread.authorize(creds)
+
     sheet = client.open_by_key(st.secrets["sheets"]["sheet_id"])
-    ws = sheet.worksheet(st.secrets["sheets"].get("sheet_name", "CD-PSR Flag"))
+    sheet_name = st.secrets["sheets"].get("sheet_name", "CD-PSR Flag")
+
+    # ✅ SAFE FALLBACK (critical fix)
+    try:
+        ws = sheet.worksheet(sheet_name)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = sheet.get_worksheet(0)
+
     df = pd.DataFrame(ws.get_all_records())
     df.columns = [c.strip() for c in df.columns]
     return df
 
+# ================= SIDEBAR =================
+with st.sidebar:
+    st.markdown("### ⚙️ Controls")
+
+    # ✅ Refresh Data (restored)
+    if st.button("🔄 Refresh Data"):
+        st.cache_data.clear()
+        st.session_state.data = None
+        st.rerun()
+
+# ================= INITIAL LOAD =================
 if st.session_state.data is None:
-    with st.spinner("Loading database..."):
+    with st.spinner("Loading customer database..."):
         st.session_state.data = load_data()
+        st.session_state.last_update = datetime.now()
 
 df = st.session_state.data
 
-# ================= SIDEBAR OVERVIEW (RESTORED) =================
+# ================= SIDEBAR OVERVIEW =================
 with st.sidebar:
+    st.markdown("---")
     st.markdown("### 📊 Database Overview")
 
     total_customers = len(df)
 
-    ask_image = df[df["CD_flag"].str.contains("ask", case=False, na=False)].shape[0] if "CD_flag" in df.columns else 0
-    do_not_ask = df[df["CD_flag"].str.contains("do not", case=False, na=False)].shape[0] if "CD_flag" in df.columns else 0
+    ask_image = (
+        df[df["CD_flag"].str.contains("ask", case=False, na=False)].shape[0]
+        if "CD_flag" in df.columns else 0
+    )
+    do_not_ask = (
+        df[df["CD_flag"].str.contains("do not", case=False, na=False)].shape[0]
+        if "CD_flag" in df.columns else 0
+    )
 
     st.metric("Total Customers", total_customers)
     st.metric("Ask for Image", ask_image)
@@ -106,13 +135,13 @@ with c2:
         disabled=not bool(bzid_input)
     )
 
-# ================= SEARCH LOGIC (FIXED) =================
+# ================= SEARCH LOGIC =================
 if search_btn and bzid_input:
 
     bzid_col = next((c for c in df.columns if "bzid" in c.lower()), None)
 
     if not bzid_col:
-        st.error("BZID column not found.")
+        st.error("BZID column not found in sheet.")
     else:
         search_term = bzid_input.replace("BZID-", "").strip()
         customer_data = None
