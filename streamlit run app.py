@@ -46,16 +46,6 @@ if "data" not in st.session_state:
 if "last_update" not in st.session_state:
     st.session_state.last_update = None
 
-# ================= HEADER =================
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.markdown("## PSR CD Flag Dashboard")
-    st.caption("Enterprise-grade customer data lookup system")
-
-with col2:
-    st.caption("Last Updated")
-    st.write(datetime.now().strftime("%d %b %Y, %H:%M"))
-
 # ================= LOAD DATA =================
 @st.cache_data(ttl=300)
 def load_data():
@@ -80,12 +70,14 @@ def load_data():
     df.columns = [c.strip() for c in df.columns]
     return df
 
-# ================= SIDEBAR =================
+# ================= SIDEBAR CONTROLS =================
 with st.sidebar:
     st.markdown("### ⚙️ Controls")
+
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
-        st.session_state.data = None
+        st.session_state.data = load_data()
+        st.session_state.last_update = datetime.now()
         st.rerun()
 
 # ================= INITIAL LOAD =================
@@ -96,22 +88,40 @@ if st.session_state.data is None:
 
 df = st.session_state.data
 
+# ================= HEADER =================
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    st.markdown("## PSR CD Flag Dashboard")
+    st.caption("Enterprise-grade customer data lookup system")
+
+with col2:
+    st.caption("Last Updated")
+    if st.session_state.last_update:
+        st.write(st.session_state.last_update.strftime("%d %b %Y, %H:%M"))
+    else:
+        st.write("—")
+
 # ================= SIDEBAR OVERVIEW =================
 with st.sidebar:
     st.markdown("---")
     st.markdown("### 📊 Database Overview")
 
-    st.metric("Total Customers", len(df))
+    total_customers = len(df)
 
-    ask_image = (
-        df[df["CD_flag"].str.contains("ask", case=False, na=False)].shape[0]
-        if "CD_flag" in df.columns else 0
-    )
-    do_not_ask = (
-        df[df["CD_flag"].str.contains("do not", case=False, na=False)].shape[0]
-        if "CD_flag" in df.columns else 0
-    )
+    if "CD_flag" in df.columns:
+        ask_image = df[
+            df["CD_flag"].str.strip().str.lower() == "ask for image"
+        ].shape[0]
 
+        do_not_ask = df[
+            df["CD_flag"].str.strip().str.lower() == "do not ask for image"
+        ].shape[0]
+    else:
+        ask_image = 0
+        do_not_ask = 0
+
+    st.metric("Total Customers", total_customers)
     st.metric("Ask for Image", ask_image)
     st.metric("Do Not Ask Image", do_not_ask)
 
@@ -149,11 +159,11 @@ if search_btn and bzid_input:
         if customer_data is None:
             st.error("Customer not found.")
         else:
-            # ✅ SAFE PSR % CONVERSION
+            # ================= SAFE PSR % =================
             psr_val = pd.to_numeric(customer_data.get("psr_pct"), errors="coerce")
             psr_pct_display = f"{psr_val * 100:.2f}%" if pd.notna(psr_val) else "NA"
 
-            # ================= COPY BLOCK =================
+            # ================= COPY FOR TICKET =================
             ticket_text = f"""
 Cluster: {customer_data.get('cluster', 'NA')}
 Hub: {customer_data.get('hub', 'NA')}
