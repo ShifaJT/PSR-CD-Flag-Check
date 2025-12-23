@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================= CSS (ONLY REQUIRED HIGHLIGHTS) =================
+# ================= CSS =================
 st.markdown("""
 <style>
 div[data-testid="stTextInput"] > div > input {
@@ -83,7 +83,6 @@ def load_data():
 # ================= SIDEBAR =================
 with st.sidebar:
     st.markdown("### ⚙️ Controls")
-
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
         st.session_state.data = None
@@ -102,19 +101,17 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📊 Database Overview")
 
-    total_customers = len(df)
+    st.metric("Total Customers", len(df))
 
     ask_image = (
         df[df["CD_flag"].str.contains("ask", case=False, na=False)].shape[0]
         if "CD_flag" in df.columns else 0
     )
-
     do_not_ask = (
         df[df["CD_flag"].str.contains("do not", case=False, na=False)].shape[0]
         if "CD_flag" in df.columns else 0
     )
 
-    st.metric("Total Customers", total_customers)
     st.metric("Ask for Image", ask_image)
     st.metric("Do Not Ask Image", do_not_ask)
 
@@ -131,10 +128,7 @@ with c1:
 
 with c2:
     st.markdown("<br>", unsafe_allow_html=True)
-    search_btn = st.button(
-        "Search Database",
-        disabled=not bool(bzid_input)
-    )
+    search_btn = st.button("Search Database", disabled=not bool(bzid_input))
 
 # ================= SEARCH LOGIC =================
 if search_btn and bzid_input:
@@ -142,7 +136,7 @@ if search_btn and bzid_input:
     bzid_col = next((c for c in df.columns if "bzid" in c.lower()), None)
 
     if not bzid_col:
-        st.error("BZID column not found in sheet.")
+        st.error("BZID column not found.")
     else:
         search_term = bzid_input.replace("BZID-", "").strip()
         customer_data = None
@@ -155,13 +149,11 @@ if search_btn and bzid_input:
         if customer_data is None:
             st.error("Customer not found.")
         else:
-            # ================= COPY FOR TICKET =================
-            psr_pct_display = (
-                f"{float(customer_data['psr_pct']) * 100:.2f}%"
-                if "psr_pct" in df.columns and pd.notna(customer_data["psr_pct"])
-                else "NA"
-            )
+            # ✅ SAFE PSR % CONVERSION
+            psr_val = pd.to_numeric(customer_data.get("psr_pct"), errors="coerce")
+            psr_pct_display = f"{psr_val * 100:.2f}%" if pd.notna(psr_val) else "NA"
 
+            # ================= COPY BLOCK =================
             ticket_text = f"""
 Cluster: {customer_data.get('cluster', 'NA')}
 Hub: {customer_data.get('hub', 'NA')}
@@ -183,14 +175,13 @@ Delivered GMV: {customer_data.get('del_gmv', 'NA')}
 
             rows = []
             for col in df.columns:
-                val = customer_data[col]
-                if pd.isna(val) or str(val).strip() == "":
-                    continue
+                raw_val = customer_data[col]
 
                 if col.lower() == "psr_pct":
-                    display_val = f"{float(val) * 100:.2f}%"
+                    num = pd.to_numeric(raw_val, errors="coerce")
+                    display_val = f"{num * 100:.2f}%" if pd.notna(num) else "NA"
                 else:
-                    display_val = val
+                    display_val = raw_val if str(raw_val).strip() != "" else "NA"
 
                 rows.append({
                     "Field": col.replace("_", " ").title(),
