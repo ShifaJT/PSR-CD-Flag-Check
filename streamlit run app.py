@@ -47,7 +47,7 @@ if "last_update" not in st.session_state:
     st.session_state.last_update = None
 
 # ================= LOAD DATA =================
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=000)
 def load_data():
     creds = service_account.Credentials.from_service_account_info(
         dict(st.secrets["gcp_service_account"]),
